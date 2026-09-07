@@ -4,7 +4,6 @@ from datetime import datetime
 import calendar
 import re
 
-
 class ContractSpecifier:
     @staticmethod
     def get_multiplier(base_asset: str) -> int:
@@ -76,17 +75,29 @@ class ArbitrageEngine:
         alt_gross_return = required_capital * ((1 + self.monthly_rate) ** (days_to_exp / 30)) - required_capital
         alt_net_return = alt_gross_return * (1 - self.stopaj)
         
+        # Eklenen Sütunlar
+        df['Spot_Price'] = df['underlying_close']
+        df['Future_Price'] = df['bid']
         df['Days'] = days_to_exp
         df['Req_Capital'] = required_capital
         df['Gross_Profit'] = gross_profit
         df['Net_Profit'] = net_profit
         df['Alt_Net_Return'] = alt_net_return
         
+        # Basit 30 günlük getiri yüzdeleri (Net Kar * 30 / Gün)
+        df['Opp_Monthly_%'] = (df['Alt_Net_Return'] / df['Req_Capital']) * 100 * (30 / df['Days'])
+        df['Arb_Monthly_%'] = (df['Net_Profit'] / df['Req_Capital']) * 100 * (30 / df['Days'])
+        df['Gross_Monthly_%'] = (df['Gross_Profit'] / df['Req_Capital']) * 100 * (30 / df['Days'])
+
         # Yalnızca arbitraj kârı fırsat maliyetini aşanları getir
         opportunities = df[df['Net_Profit'] > df['Alt_Net_Return']].copy()
         
-        cols = ['Contract', 'Days', 'Req_Capital', 'Gross_Profit', 'Net_Profit', 'Alt_Net_Return']
-        return opportunities[cols].sort_values(by='Net_Profit', ascending=False)
+        cols = [
+            'Contract', 'Spot_Price', 'Future_Price', 'Days', 
+            'Req_Capital', 'Gross_Profit', 'Net_Profit', 'Alt_Net_Return', 
+            'Opp_Monthly_%', 'Arb_Monthly_%', 'Gross_Monthly_%'
+        ]
+        return opportunities[cols].sort_values(by='Gross_Monthly_%', ascending=False)
 
 if __name__ == "__main__":
     raw_df = FintablesDataFetcher().fetch()
