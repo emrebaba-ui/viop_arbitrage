@@ -11,28 +11,29 @@ class SpotFutureEngine:
         if df is None or df.empty: 
             return pd.DataFrame()
             
-        # Filter valid rows
-        df = df.dropna(subset=['underlying_close', 'bid', 'volume_lot'])
-        df = df[(df['underlying_close'] > 0) & (df['bid'] > 0)].copy()
+        df = df.dropna(subset=['underlying_close', 'bid', 'volume_lot', 'Req_Capital']).copy()
+        df = df[(df['underlying_close'] > 0) & (df['bid'] > 0)]
         
-        # Volume filter
-        volume_tl = df['volume_lot'] * df['bid']
-        df = df[volume_tl >= self.min_volume_tl].copy()
+        is_usd = df['BaseAsset'].str.endswith('USD')
+        fx_rate = df['USD_Rate'].where(is_usd, 1.0)
+        
+        df['Volume_TL'] = df['volume_lot'] * df['bid'] * df['Multiplier'] * fx_rate
+        df = df[df['Volume_TL'] >= self.min_volume_tl].copy()
         
         if df.empty:
             return df
             
-        # Calculate PnL (per 1 contract)
-        df['Gross_Profit'] = (df['bid'] - df['underlying_close']) * df['Multiplier']
-        df['Total_Comm'] = self.commission_rate * (df['bid'] + df['underlying_close']) * df['Multiplier']
+        df['Gross_Profit'] = (df['bid'] - df['underlying_close']) * df['Multiplier'] * fx_rate
+        df['Total_Comm'] = self.commission_rate * (df['bid'] + df['underlying_close']) * df['Multiplier'] * fx_rate
         df['Net_Profit'] = df['Gross_Profit'] - df['Total_Comm']
         
-        # Calculate required capital and alternative returns
-        df['Req_Capital'] = (df['underlying_close'] * df['Multiplier']) + df['Total_Comm']
+        # Spot asset covers VIOP margin requirements
+        df['Spot_Cost'] = df['underlying_close'] * df['Multiplier'] * fx_rate
+        df['Req_Capital'] = df['Spot_Cost'] 
+        
         alt_gross = df['Req_Capital'] * ((1 + self.monthly_rate) ** (df['Days'] / 30)) - df['Req_Capital']
         df['Alt_Net_Return'] = alt_gross * (1 - self.stopaj)
         
-        # Calculate monthly yields
         day_factor = 30 / df['Days']
         df['Opp_Monthly_%'] = (df['Alt_Net_Return'] / df['Req_Capital']) * 100 * day_factor
         df['Arb_Monthly_%'] = (df['Net_Profit'] / df['Req_Capital']) * 100 * day_factor
@@ -41,7 +42,5 @@ class SpotFutureEngine:
         df['Spot_Price'] = df['underlying_close']
         df['Future_Price'] = df['bid']
         
-        # Filter profitable opportunities
         opportunities = df[df['Net_Profit'] > df['Alt_Net_Return']].copy()
-        
-        return opportunities.sort_values(by='Gross_Monthly_%', ascending=False)
+        return opportunities.sort_values(by='Arb_Monthly_%', ascending=False)

@@ -4,24 +4,38 @@ from datetime import datetime
 import calendar
 import re
 
-# --- Pure Functions (FP Approach) ---
+def get_base_asset(contract_code: str) -> str:
+    # Remove prefix
+    c = re.sub(r'^(?:TM_)?F_', '', contract_code)
+    
+    # Check known indices with numbers
+    known_indices = ['XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10']
+    for idx in known_indices:
+        if c.startswith(idx): 
+            return idx
+            
+    # For standard assets (HEKTS, USDTRY, XAUUSD), extract letters
+    m = re.match(r'^([A-Za-z]+)', c)
+    if m: 
+        return m.group(1)
+        
+    return c[:-4] # Fallback
 
 def get_multiplier(base_asset: str) -> int:
-    # Determine contract multiplier based on asset type
     currencies = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
-    indices = {'XU030', 'XLBNK', 'X10XB', 'XSD25'}
+    indices = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
+    metals_1 = {'XAUUSD', 'XAUTRY', 'XPTUSD', 'XPDUSD', 'XCUUSD'}
+    metals_10 = {'XAGUSD', 'XAGTRY'}
     
-    if base_asset in currencies: 
-        return 1000
-    elif base_asset in indices: 
-        return 10
+    if base_asset in currencies: return 1000
+    elif base_asset in indices: return 10
+    elif base_asset in metals_1: return 1
+    elif base_asset in metals_10: return 10
     return 100
 
 def calculate_days_to_exp(contract_code: str, current_date: datetime) -> int:
-    # Extract expiration date from contract code and calculate days left
     match = re.search(r'\d{4,6}$', contract_code)
-    if not match: 
-        return 1
+    if not match: return 1
         
     mmyy = match.group()
     month = int(mmyy[-4:-2])
@@ -29,12 +43,7 @@ def calculate_days_to_exp(contract_code: str, current_date: datetime) -> int:
     _, last_day = calendar.monthrange(year, month)
     
     target_date = datetime(year, month, last_day)
-    days_left = (target_date - current_date).days
-    
-    return max(days_left, 1)
-
-
-# --- Data Service (OOP Approach) ---
+    return max((target_date - current_date).days, 1)
 
 class MarketDataService:
     def __init__(self):
@@ -52,7 +61,7 @@ class MarketDataService:
             return pd.DataFrame(), None
             
         data = response.json()
-        server_time_str = response.headers.get('Date') # Gets GMT server time
+        server_time_str = response.headers.get('Date')
         
         df = pd.DataFrame([
             {"Contract": code, **dict(zip(data["columns"], vals))}
@@ -67,21 +76,21 @@ class MarketDataService:
             return df, None
             
         current_date = datetime.now()
-        df['BaseAsset'] = df['Contract'].apply(lambda x: re.sub(r'^(?:TM_)?F_|\d{4,6}$', '', x))
+        df['BaseAsset'] = df['Contract'].apply(get_base_asset)
         df['Multiplier'] = df['BaseAsset'].apply(get_multiplier)
         df['Days'] = df['Contract'].apply(lambda x: calculate_days_to_exp(x, current_date))
         
+        usdtry_df = df[df['BaseAsset'] == 'USDTRY'].sort_values('Days')
+        if not usdtry_df.empty:
+            best_row = usdtry_df.iloc[0]
+            usd_rate = best_row['bid'] if pd.notna(best_row['bid']) and best_row['bid'] > 0 else best_row['underlying_close']
+        else:
+            usd_rate = 1.0
+            
+        df['USD_Rate'] = usd_rate
+        df['Req_Capital'] = df['psr_close'].astype(float)
+        
+        is_usd_based = df['BaseAsset'].str.endswith('USD')
+        df.loc[is_usd_based, 'Req_Capital'] = df['Req_Capital'] * df['USD_Rate']
+        
         return df, server_time
-
-# --- Testing the Service ---
-if __name__ == "__main__":
-    service = MarketDataService()
-    prepared_df = service.get_prepared_data()[0]
-    server_time = service.get_prepared_data()[1]
-    
-    if not prepared_df.empty:
-        print("Data fetched and prepared successfully.")
-        print(prepared_df[['Contract', 'BaseAsset', 'Multiplier', 'Days']].head())
-        print(f"Server Time: {server_time}")
-    else:
-        print("Failed to fetch data.")

@@ -2,7 +2,8 @@ import pandas as pd
 from itertools import combinations
 
 class FutureSpreadEngine:
-    def __init__(self, min_volume_tl=50000, commission_rate=0.001):
+    def __init__(self, target_rate=0.35, min_volume_tl=50000, commission_rate=0.001):
+        self.target_rate = target_rate 
         self.min_volume_tl = min_volume_tl
         self.commission_rate = commission_rate
 
@@ -10,72 +11,100 @@ class FutureSpreadEngine:
         if df is None or df.empty: 
             return pd.DataFrame()
             
-        # Filter valid rows
-        df = df.dropna(subset=['underlying_close', 'bid', 'ask', 'volume_lot'])
-        df = df[(df['underlying_close'] > 0) & (df['bid'] > 0) & (df['ask'] > 0)].copy()
+        df = df.dropna(subset=['bid', 'ask', 'volume_lot', 'Req_Capital']).copy()
+        df = df[(df['bid'] > 0) & (df['ask'] > 0)]
         
-        # Volume filter
+        is_usd = df['BaseAsset'].str.endswith('USD')
+        fx_rate = df['USD_Rate'].where(is_usd, 1.0)
+        
         df['Mid_Price'] = (df['bid'] + df['ask']) / 2
-        df['Volume_TL'] = df['volume_lot'] * df['Mid_Price']
+        df['Volume_TL'] = df['volume_lot'] * df['Mid_Price'] * df['Multiplier'] * fx_rate
         df = df[df['Volume_TL'] >= self.min_volume_tl].copy()
         
         if df.empty:
             return df
             
-        # Calculate implied interest rates
-        df['Implied_Rate_Bid'] = ((df['bid'] / df['underlying_close']) - 1) * (365 / df['Days'])
-        df['Implied_Rate_Ask'] = ((df['ask'] / df['underlying_close']) - 1) * (365 / df['Days'])
-        
         spread_opportunities = []
         
         for asset, group in df.groupby('BaseAsset'):
             if len(group) < 2: 
                 continue
                 
+            asset_rate = 0.04 if asset.endswith('USD') else self.target_rate # type: ignore
+                
             group = group.sort_values('Days')
             contracts = group.to_dict('records')
             
             for c1, c2 in combinations(contracts, 2):
-                # Scenario 1: Buy Near (Ask), Sell Far (Bid)
-                rate_diff_1 = c2['Implied_Rate_Bid'] - c1['Implied_Rate_Ask']
+                days_diff = c2['Days'] - c1['Days']
+                if days_diff <= 0: continue
                 
-                # Scenario 2: Sell Near (Bid), Buy Far (Ask)
-                rate_diff_2 = c1['Implied_Rate_Bid'] - c2['Implied_Rate_Ask']
-                
-                if rate_diff_1 > 0 and rate_diff_1 > rate_diff_2:
-                    rate_diff = rate_diff_1
-                    near_action, near_price = 'BUY', c1['ask']
-                    far_action, far_price = 'SELL', c2['bid']
-                elif rate_diff_2 > 0 and rate_diff_2 > rate_diff_1:
-                    rate_diff = rate_diff_2
-                    near_action, near_price = 'SELL', c1['bid']
-                    far_action, far_price = 'BUY', c2['ask']
-                else:
-                    continue # Skip if no profit
-                
-                # Calculate metrics
                 multiplier = c1['Multiplier']
-                underlying_close = c1['underlying_close']
+                is_usd_asset = asset.endswith('USD') # type: ignore
+                fx = c1.get('USD_Rate', 1.0) if is_usd_asset else 1.0
+
+                convergence_ratio = c1['Days'] / c2['Days'] 
                 
-                total_comm = (near_price + far_price) * multiplier * self.commission_rate
-                daily_return = (rate_diff / 365) * underlying_close * multiplier
+                # --- BUY SPREAD ---
+                implied_rate_buy = (c2['ask'] / c1['bid']) ** (365 / days_diff) - 1
                 
-                days_to_breakeven = total_comm / daily_return if daily_return > 0 else float('inf')
+                fair_far_buy_spread = c1['bid'] * ((1 + asset_rate) ** (days_diff / 365))
+                total_mispricing_buy = fair_far_buy_spread - c2['ask']
+                
+                # total divergence * time at hand
+                gross_profit_buy = total_mispricing_buy * convergence_ratio * multiplier * fx
+                comm_buy = (c1['bid'] + c2['ask']) * multiplier * self.commission_rate * fx
+                net_profit_buy = gross_profit_buy - comm_buy
+                
+                # --- SELL SPREAD ---
+                implied_rate_sell = (c2['bid'] / c1['ask']) ** (365 / days_diff) - 1
+                
+                fair_far_sell_spread = c1['ask'] * ((1 + asset_rate) ** (days_diff / 365))
+                total_mispricing_sell = c2['bid'] - fair_far_sell_spread
+                
+                # total divergence * time at hand
+                gross_profit_sell = total_mispricing_sell * convergence_ratio * multiplier * fx
+                comm_sell = (c1['ask'] + c2['bid']) * multiplier * self.commission_rate * fx
+                net_profit_sell = gross_profit_sell - comm_sell
+                
+                if net_profit_buy > 0 and net_profit_buy > net_profit_sell:
+                    near_action, near_price = f'SELL: {c1['Contract']}', c1['bid']
+                    far_action, far_price = f'BUY: {c2['Contract']}', c2['ask']
+                    net_profit = net_profit_buy
+                    total_comm = comm_buy
+                    type_str = "BUY SPREAD"
+                    final_implied = implied_rate_buy
+                elif net_profit_sell > 0 and net_profit_sell > net_profit_buy:
+                    near_action, near_price = f'BUY: {c1['Contract']}', c1['ask']
+                    far_action, far_price = f'SELL: {c2['Contract']}', c2['bid']
+                    net_profit = net_profit_sell
+                    total_comm = comm_sell
+                    type_str = "SELL SPREAD"
+                    final_implied = implied_rate_sell
+                else:
+                    continue
+                
+                req_capital = max(c1['Req_Capital'], c2['Req_Capital'])
+                holding_days = max(c1['Days'], 1) 
+                daily_profit = net_profit / holding_days
+                daily_roi = daily_profit * 100 / req_capital
                 
                 spread_opportunities.append({
                     'Asset': asset,
-                    'Near_Contract': c1['Contract'],
+                    'Type': type_str,
                     'Near_Action': f"{near_action} @ {near_price:.2f}",
-                    'Far_Contract': c2['Contract'],
                     'Far_Action': f"{far_action} @ {far_price:.2f}",
-                    'Rate_Diff_%': rate_diff * 100,
+                    'Hold_Days': holding_days,
+                    'Implied_%': final_implied * 100,
+                    'Req_Capital': req_capital,
                     'Total_Comm': total_comm,
-                    'Daily_Return': daily_return,
-                    'Breakeven_Days': days_to_breakeven
+                    'Net_Profit': net_profit,
+                    'Daily_Profit': daily_profit,
+                    'Daily_ROI': daily_roi
                 })
                 
         results_df = pd.DataFrame(spread_opportunities)
         if not results_df.empty:
-            results_df = results_df.sort_values(by='Breakeven_Days', ascending=True)
+            results_df = results_df.sort_values(by='Daily_ROI', ascending=False)
             
         return results_df
