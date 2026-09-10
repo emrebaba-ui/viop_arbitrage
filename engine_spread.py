@@ -100,11 +100,11 @@ class FutureSpreadEngine:
                     'Total_Comm': total_comm,
                     'Net_Profit': net_profit,
                     'Daily_Profit': daily_profit,
-                    'Daily_ROI': daily_roi
+                    'Daily_ROI_%': daily_roi
                 })
                 
         results_df = pd.DataFrame(spread_opportunities)
         if not results_df.empty:
-            results_df = results_df.sort_values(by='Daily_ROI', ascending=False)
+            results_df = results_df.sort_values(by='Daily_ROI_%', ascending=False)
             
         return results_df

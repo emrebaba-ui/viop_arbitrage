@@ -74,7 +74,7 @@ def main():
                     print("--- FUTURE SPREAD OPPORTUNITIES (TOP 20) ---")
                     spread_results = spread_engine.process(filtered_df)
                     if not spread_results.empty:
-                        cols = ['Asset', 'Type', 'Near_Action', 'Far_Action', 'Hold_Days', 'Implied_%', 'Net_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI']
+                        cols = ['Asset', 'Type', 'Near_Action', 'Far_Action', 'Hold_Days', 'Implied_%', 'Net_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI_%']
                         print(spread_results[cols].head(20).round(2).to_string(index=False))
                     else:
                         print("No profitable Future Spread opportunities found.")

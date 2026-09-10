@@ -24,7 +24,7 @@ def get_base_asset(contract_code: str) -> str:
 def get_multiplier(base_asset: str) -> int:
     currencies = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
     indices = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
-    metals_1 = {'XAUUSD', 'XAUTRY', 'XPTUSD', 'XPDUSD', 'XCUUSD'}
+    metals_1 = {'XAUUSD', 'XAUTRYM', 'XPTUSD', 'XPDUSD', 'XCUUSD'}
     metals_10 = {'XAGUSD', 'XAGTRY'}
     
     if base_asset in currencies: return 1000
