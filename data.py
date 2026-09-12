@@ -4,13 +4,15 @@ from datetime import datetime
 import calendar
 import re
 
+from config import *
+
+
 def get_base_asset(contract_code: str) -> str:
     # Remove prefix
     c = re.sub(r'^(?:TM_)?F_', '', contract_code)
     
     # Check known indices with numbers
-    known_indices = ['XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10']
-    for idx in known_indices:
+    for idx in INDICES:
         if c.startswith(idx): 
             return idx
             
@@ -22,15 +24,12 @@ def get_base_asset(contract_code: str) -> str:
     return c[:-4] # Fallback
 
 def get_multiplier(base_asset: str) -> int:
-    currencies = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
-    indices = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
-    metals_1 = {'XAUUSD', 'XAUTRYM', 'XPTUSD', 'XPDUSD', 'XCUUSD'}
     metals_10 = {'XAGUSD', 'XAGTRY'}
     
-    if base_asset in currencies: return 1000
-    elif base_asset in indices: return 10
-    elif base_asset in metals_1: return 1
+    if base_asset in CURRENCIES: return 1000
+    elif base_asset in INDICES: return 10
     elif base_asset in metals_10: return 10
+    elif base_asset in METALS: return 1
     return 100
 
 def calculate_days_to_exp(contract_code: str, current_date: datetime) -> int:

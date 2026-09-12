@@ -1,23 +1,18 @@
-import os
+import subprocess
 import time
 import pandas as pd
 from datetime import timedelta
 from email.utils import parsedate_to_datetime
 
+from config import *
 from data import MarketDataService
 from engine_spot import SpotFutureEngine
 from engine_spread import FutureSpreadEngine
 from position_tracker import PositionTracker
 
-DISPLAY_MODE = 'ALL'
-ASSET_FILTER = 'ALL' 
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
-
-CURRENCIES = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
-INDICES = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
-METALS = {'XAUUSD', 'XAUTRY', 'XPTUSD', 'XPDUSD', 'XAGUSD', 'XAGTRY', 'XCUUSD'}
 
 def get_asset_class(base_asset: str) -> str:
     if base_asset in CURRENCIES: return 'CURRENCY'
@@ -49,7 +44,7 @@ def main():
     while True:
         try:
             df, server_time_str = data_service.get_prepared_data()
-            os.system('clear')
+            subprocess.run('clear')
             
             current_time = parse_and_adjust_time(server_time_str)
             print("=" * 125)
@@ -78,11 +73,11 @@ def main():
                     print(spread_results[cols].head(20).round(2).to_string(index=False))
                 else:
                     print("No profitable Future Spread opportunities found.")
+                print("\n")
 
                 res_df = tracker.print_status(filtered_df, spread_results)
                 print("--- OPEN POSITIONS STATUS ---")
-                print(res_df.fillna('-').round(2).to_string(index=False))
-                print("\n")
+                print(res_df.fillna('-').round(2).to_string(index=False))   # type: ignore
                         
         except Exception as e:
             print(f"Error: {e}")

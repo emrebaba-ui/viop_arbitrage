@@ -1,0 +1,25 @@
+"""
+ ** For now, its unnecessary **
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+api_key = os.getenv("API_KEY")
+"""
+
+# --- FILTERS ---
+DISPLAY_MODE = 'ALL'
+ASSET_FILTER = 'ALL'
+
+# --- FINANCIALS ---
+COMMISSION_RATE = 0.001
+STOPPAGE = 0.175
+SPOT_MIN_VOLUME_TL = 10000
+SPREAD_MIN_VOLUME_TL = 10000
+ANNUAL_RISK_FREE_RATE = 0.37
+MONTHLY_RISK_FREE_RATE = (1 + ANNUAL_RISK_FREE_RATE) ** (1/12) - 1
+
+# --- ASSET CLASSES ---
+CURRENCIES = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
+INDICES = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
+METALS = {'XAUUSD', 'XAUTRY', 'XPTUSD', 'XPDUSD', 'XAGUSD', 'XAGTRY', 'XCUUSD'}

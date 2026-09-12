@@ -1,8 +1,11 @@
 import pandas as pd
 from itertools import combinations
 
+from config import *
+
+
 class FutureSpreadEngine:
-    def __init__(self, target_rate=0.37, min_volume_tl=50000, commission_rate=0.001):
+    def __init__(self, target_rate=ANNUAL_RISK_FREE_RATE, min_volume_tl=SPREAD_MIN_VOLUME_TL, commission_rate=COMMISSION_RATE):
         self.target_rate = target_rate 
         self.min_volume_tl = min_volume_tl
         self.commission_rate = commission_rate

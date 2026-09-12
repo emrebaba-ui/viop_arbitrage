@@ -1,7 +1,10 @@
 import pandas as pd
 
+from config import *
+
+
 class SpotFutureEngine:
-    def __init__(self, min_volume_tl=10000, monthly_rate=0.03, stopaj=0.175, commission_rate=0.001):
+    def __init__(self, min_volume_tl=SPOT_MIN_VOLUME_TL, monthly_rate=MONTHLY_RISK_FREE_RATE, stopaj=STOPPAGE, commission_rate=COMMISSION_RATE):
         self.min_volume_tl = min_volume_tl
         self.monthly_rate = monthly_rate
         self.stopaj = stopaj
@@ -27,17 +30,18 @@ class SpotFutureEngine:
         df['Total_Comm'] = self.commission_rate * (df['bid'] + df['underlying_close']) * df['Multiplier'] * fx_rate
         df['Net_Profit'] = df['Gross_Profit'] - df['Total_Comm']
         
-        # Spot asset covers VIOP margin requirements
+        # VIOP margin requirement is disregarded
         df['Spot_Cost'] = df['underlying_close'] * df['Multiplier'] * fx_rate
         df['Req_Capital'] = df['Spot_Cost'] 
         
         alt_gross = df['Req_Capital'] * ((1 + self.monthly_rate) ** (df['Days'] / 30)) - df['Req_Capital']
         df['Alt_Net_Return'] = alt_gross * (1 - self.stopaj)
         
+        # (1+monthly_rate)^(30/days) - 1 mechanism // each return was standardized on a monthly basis
         day_factor = 30 / df['Days']
-        df['Opp_Monthly_%'] = (df['Alt_Net_Return'] / df['Req_Capital']) * 100 * day_factor
-        df['Arb_Monthly_%'] = (df['Net_Profit'] / df['Req_Capital']) * 100 * day_factor
-        df['Gross_Monthly_%'] = (df['Gross_Profit'] / df['Req_Capital']) * 100 * day_factor
+        df['Opp_Monthly_%'] = ((1 + df['Alt_Net_Return'] / df['Req_Capital']) ** day_factor - 1) * 100
+        df['Arb_Monthly_%'] = ((1 + df['Net_Profit'] / df['Req_Capital']) ** day_factor - 1) * 100
+        df['Gross_Monthly_%'] = ((1 + df['Gross_Profit'] / df['Req_Capital']) ** day_factor - 1) * 100
 
         df['Spot_Price'] = df['underlying_close']
         df['Future_Price'] = df['bid']
