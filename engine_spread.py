@@ -10,7 +10,7 @@ class FutureSpreadEngine:
         self.min_volume_tl = min_volume_tl
         self.commission_rate = commission_rate
 
-    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+    def process(self, df: pd.DataFrame | None) -> pd.DataFrame:
         if df is None or df.empty: 
             return pd.DataFrame()
             
@@ -32,8 +32,9 @@ class FutureSpreadEngine:
         for asset, group in df.groupby('BaseAsset'):
             if len(group) < 2: 
                 continue
-                
-            asset_rate = 0.04 if asset.endswith('USD') else self.target_rate # type: ignore
+
+            asset_key = str(asset).upper()
+            asset_rate = 0.04 if asset_key.endswith('USD') else self.target_rate 
                 
             group = group.sort_values('Days')
             contracts = group.to_dict('records')
@@ -43,7 +44,7 @@ class FutureSpreadEngine:
                 if days_diff <= 0: continue
                 
                 multiplier = c1['Multiplier']
-                is_usd_asset = asset.endswith('USD') # type: ignore
+                is_usd_asset = asset_key.endswith('USD')
                 fx = c1.get('USD_Rate', 1.0) if is_usd_asset else 1.0
 
                 if multiplier == 100: # Stocks must be sold ~3 days earlier

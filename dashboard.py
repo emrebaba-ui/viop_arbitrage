@@ -77,7 +77,8 @@ def main():
 
                 res_df = tracker.print_status(filtered_df, spread_results)
                 print("--- OPEN POSITIONS STATUS ---")
-                print(res_df.fillna('-').round(2).to_string(index=False))   # type: ignore
+                assert res_df is not None
+                print(res_df.fillna('-').round(2).to_string(index=False))
                         
         except Exception as e:
             print(f"Error: {e}")

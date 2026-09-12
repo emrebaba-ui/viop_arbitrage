@@ -10,7 +10,7 @@ class SpotFutureEngine:
         self.stopaj = stopaj
         self.commission_rate = commission_rate
 
-    def process(self, df: pd.DataFrame) -> pd.DataFrame:
+    def process(self, df: pd.DataFrame | None) -> pd.DataFrame:
         if df is None or df.empty: 
             return pd.DataFrame()
             
