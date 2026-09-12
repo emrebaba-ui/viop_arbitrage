@@ -1,68 +1,89 @@
-import re
 import pandas as pd
+import numpy as np
 
 class PositionTracker:
-    def __init__(self, trades_file="trades.csv"):
+    def __init__(self, trades_file='trades.csv'):
         self.trades_file = trades_file
 
-    def _parse_action(self, action_str: str):
-        # Parses "SELL: F_HALKB0926 @ 50.92" -> ('SELL', 'F_HALKB0926', 50.92)
-        match = re.search(r'(BUY|SELL):\s*([A-Za-z0-9_]+)\s*@\s*([\d.]+)', str(action_str))
-        if match:
-            act, contract, price = match.groups()
-            return act.upper(), contract, float(price)
-        return None, None, 0.0
-
-    def track_open_positions(self, spread_df: pd.DataFrame, market_df: pd.DataFrame):
-        """
-        Matches open trades in trades.csv with engine_spread output.
-        """
+    def parse_action(self, action_str):
+        # parse format: "SELL: F_HALKB0926 @ 50.92"
         try:
-            trades_df = pd.read_csv(self.trades_file)
-        except Exception:
+            parts = str(action_str).replace(':', '').split()
+            return parts[0], parts[1], float(parts[3])
+        except (IndexError, ValueError, AttributeError):
+            return None, None, 0.0
+
+    def print_status(self, live_data: pd.DataFrame, spread_results: pd.DataFrame):
+        # load trades
+        try:
+            df_trades = pd.read_csv(self.trades_file)
+            df_trades.columns = df_trades.columns.str.strip()
+        except FileNotFoundError:
+            print(f"No {self.trades_file}")
             return
 
-        # Filter open positions (Result column is empty/NaN)
-        open_trades = trades_df[trades_df['Result'].isna() | (trades_df['Result'].astype(str).str.strip() == '')]
-        if open_trades.empty or spread_df is None or spread_df.empty:
+        # filter open positions
+        open_pos = df_trades[df_trades['Result'].fillna('').str.strip() == ''].copy()
+        if open_pos.empty:
             return
+            
+        # extract contract names for easy matching if spread_results exists
+        if spread_results is not None and not spread_results.empty:
+            spread_results = spread_results.copy()
+            spread_results['Near_Contract'] = spread_results['Near_Action'].apply(lambda x: self.parse_action(x)[1])
+            spread_results['Far_Contract'] = spread_results['Far_Action'].apply(lambda x: self.parse_action(x)[1])
 
-        # Index spread_df by (Near_Contract, Far_Contract) for O(1) fast lookup
-        spread_map = spread_df.set_index(['Near_Contract', 'Far_Contract']).to_dict('index')
-        market_map = market_df.set_index('Contract').to_dict('index') if market_df is not None else {}
+        results = []
+        for _, row in open_pos.iterrows():
+            amount = float(row['Amount'])
+            near_type, near_contract, near_entry = self.parse_action(row['Near Action'])
+            far_type, far_contract, far_entry = self.parse_action(row['Far Action'])
 
-        for _, row in open_trades.iterrows():
-            near_act, near_code, near_entry = self._parse_action(row['Near Action'])
-            far_act, far_code, far_entry = self._parse_action(row['Far Action'])
+            # get live data for PnL calculation
+            near_market = live_data[live_data['Contract'] == near_contract]
+            far_market = live_data[live_data['Contract'] == far_contract]
 
-            key = (near_code, far_code)
-            if key not in spread_map:
+            if near_market.empty or far_market.empty:
                 continue
 
-            spread_info = spread_map[key]
-            amount = float(row.get('Amount', 1))
+            near_live = near_market.iloc[0]
+            far_live = far_market.iloc[0]
+            multiplier = near_live.get('Multiplier', 100)
 
-            # Extract current prices evaluated by engine_spread (Near_Action: "SELL @ 50.92")
-            curr_near = float(re.search(r'@\s*([\d.]+)', str(spread_info['Near_Action'])).group(1)) # type: ignore
-            curr_far = float(re.search(r'@\s*([\d.]+)', str(spread_info['Far_Action'])).group(1))   # type: ignore
+            # calculate PnL using live bid/ask
+            near_close = near_live['ask'] if near_type == 'SELL' else near_live['bid']
+            far_close = far_live['ask'] if far_type == 'SELL' else far_live['bid']
 
-            # Multiplier and FX lookup from market_df for PnL scaling
-            mkt = market_map.get(near_code, {})
-            mult = mkt.get('Multiplier', 100)
-            fx = mkt.get('USD_Rate', 1.0) if mkt.get('BaseAsset', '').endswith('USD') else 1.0
+            near_pnl = (near_entry - near_close) if near_type == 'SELL' else (near_close - near_entry)
+            far_pnl = (far_entry - far_close) if far_type == 'SELL' else (far_close - far_entry)
+            gross_pnl = (near_pnl + far_pnl) * multiplier * amount
 
-            # Unrealized PnL (Anlık kâr/zarar)
-            pnl_near = (near_entry - curr_near) if near_act == 'SELL' else (curr_near - near_entry)
-            pnl_far = (curr_far - far_entry) if far_act == 'BUY' else (far_entry - curr_far)
-            pnl_total = (pnl_near + pnl_far) * mult * amount * fx
+            # get engine data from spread_results
+            implied = np.nan
+            total_comm = np.nan
+            net_profit = np.nan
+            pot_profit = np.nan
 
-            yield {
+            if spread_results is not None and not spread_results.empty:
+                match = spread_results[
+                    (spread_results['Near_Contract'] == near_contract) & 
+                    (spread_results['Far_Contract'] == far_contract)
+                ]
+                if not match.empty:
+                    # columns must match engine_spread.py outputs
+                    implied = match.iloc[0].get('Implied_%', np.nan)
+                    total_comm = match.iloc[0].get('Total_Comm', np.nan)
+                    net_profit = match.iloc[0].get('Net_Profit', np.nan)
+                    pot_profit = match.iloc[0].get('Pot_Profit', np.nan)
+
+            results.append({
                 'Date': row['Date'],
-                'Near_Contract': near_code,
-                'Far_Contract': far_code,
-                'Amount': amount,
-                'Implied_%': round(spread_info.get('Implied_%', 0.0), 2),
-                'Net_Profit': round(pnl_total, 2),
-                'Pot_Profit': round(spread_info.get('Net_Profit', 0.0) * amount, 2),
-                'PNL_Near_Far_Total': (pnl_near, pnl_far, pnl_total)
-            }
+                'Pair': f"{row['Near Action']}, {row['Far Action']}",
+                'Lot': amount,
+                'Live_PnL': gross_pnl - total_comm * amount * 2,
+                'Implied_%': implied,
+                'Net_Profit': net_profit,
+                'Pot_Profit': pot_profit
+            })
+
+        return pd.DataFrame(results)

@@ -7,6 +7,7 @@ from email.utils import parsedate_to_datetime
 from data import MarketDataService
 from engine_spot import SpotFutureEngine
 from engine_spread import FutureSpreadEngine
+from position_tracker import PositionTracker
 
 DISPLAY_MODE = 'ALL'
 ASSET_FILTER = 'ALL' 
@@ -43,6 +44,7 @@ def main():
     data_service = MarketDataService()
     spot_engine = SpotFutureEngine()
     spread_engine = FutureSpreadEngine()
+    tracker = PositionTracker()
     
     while True:
         try:
@@ -60,24 +62,27 @@ def main():
             else:
                 filtered_df = filter_dataframe(df)
                 
-                if DISPLAY_MODE in ['ALL', 'SPOT']:
-                    print("--- SPOT-FUTURE OPPORTUNITIES (TOP 20) ---")
-                    spot_results = spot_engine.process(filtered_df)
-                    if not spot_results.empty:
-                        cols = ['Contract', 'Spot_Price', 'Future_Price', 'Days', 'Total_Comm', 'Net_Profit', 'Req_Capital', 'Arb_Monthly_%']
-                        print(spot_results[cols].head(20).round(2).to_string(index=False))
-                    else:
-                        print("No profitable Spot-Future opportunities found.")
-                    print("\n")
+                print("--- SPOT-FUTURE OPPORTUNITIES (TOP 20) ---")
+                spot_results = spot_engine.process(filtered_df)
+                if not spot_results.empty:
+                    cols = ['Contract', 'Spot_Price', 'Future_Price', 'Days', 'Total_Comm', 'Net_Profit', 'Req_Capital', 'Arb_Monthly_%']
+                    print(spot_results[cols].head(20).round(2).to_string(index=False))
+                else:
+                    print("No profitable Spot-Future opportunities found.")
+                print("\n")
                     
-                if DISPLAY_MODE in ['ALL', 'SPREAD']:
-                    print("--- FUTURE SPREAD OPPORTUNITIES (TOP 20) ---")
-                    spread_results = spread_engine.process(filtered_df)
-                    if not spread_results.empty:
-                        cols = ['Near_Action', 'Far_Action', 'Hold', 'Implied_%', 'Net_Profit', 'Pot_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI_%']
-                        print(spread_results[cols].head(20).round(2).to_string(index=False))
-                    else:
-                        print("No profitable Future Spread opportunities found.")
+                print("--- FUTURE SPREAD OPPORTUNITIES (TOP 20) ---")
+                spread_results = spread_engine.process(filtered_df)
+                if not spread_results.empty:
+                    cols = ['Near_Action', 'Far_Action', 'Hold', 'Implied_%', 'Net_Profit', 'Pot_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI_%']
+                    print(spread_results[cols].head(20).round(2).to_string(index=False))
+                else:
+                    print("No profitable Future Spread opportunities found.")
+
+                res_df = tracker.print_status(filtered_df, spread_results)
+                print("--- OPEN POSITIONS STATUS ---")
+                print(res_df.fillna('-').round(2).to_string(index=False))
+                print("\n")
                         
         except Exception as e:
             print(f"Error: {e}")
