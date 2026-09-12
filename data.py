@@ -1,4 +1,6 @@
+import logging
 import pandas as pd
+import time
 from curl_cffi import requests
 from datetime import datetime
 import calendar
@@ -6,6 +8,12 @@ import re
 
 from config import *
 
+# --- LOGGING ---
+logging.basicConfig(
+    filename='arbitrage_error.log',
+    level=logging.ERROR,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def get_base_asset(contract_code: str) -> str:
     # Remove prefix
@@ -53,20 +61,40 @@ class MarketDataService:
             "Origin": "https://fintables.com",
             "Referer": "https://fintables.com/"
         }
+        self.max_retries = 5
 
     def fetch_raw_data(self) -> tuple:
-        response = requests.get(self.url, headers=self.headers, impersonate="chrome")
-        if response.status_code != 200: 
-            return pd.DataFrame(), None
-            
-        data = response.json()
-        server_time_str = response.headers.get('Date')
+        retries = 0
+        backoff_time = 2
         
-        df = pd.DataFrame([
-            {"Contract": code, **dict(zip(data["columns"], vals))}
-            for code, vals in data["results"].items()
-        ])
-        return df, server_time_str
+        while retries <= self.max_retries:
+            try:
+                response = requests.get(self.url, headers=self.headers, impersonate="chrome")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    server_time_str = response.headers.get('Date')
+                    
+                    df = pd.DataFrame([
+                        {"Contract": code, **dict(zip(data["columns"], vals))}
+                        for code, vals in data["results"].items()
+                    ])
+                    return df, server_time_str
+                    
+                else:
+                    # Cloudflare 403 alike server errors
+                    logging.error(f"API Error: Status Code {response.status_code}. Attempt {retries + 1}/{self.max_retries + 1}")
+                    
+            except Exception as e:
+                # Physical errors
+                logging.error(f"Connection Failed: {e}. Attempt {retries + 1}/{self.max_retries + 1}")
+                
+            if retries < self.max_retries:
+                time.sleep(backoff_time)
+                backoff_time *= 2
+            retries += 1
+
+        return pd.DataFrame(), None
 
     def get_prepared_data(self) -> tuple:
         df, server_time = self.fetch_raw_data()
