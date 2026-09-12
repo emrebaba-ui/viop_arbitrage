@@ -75,7 +75,7 @@ class TestArbitrageModules(unittest.TestCase):
         
         expected_columns = ['Near_Action', 'Far_Action', 'Hold', 'Implied_%', 'Net_Profit', 'Pot_Profit']
         for col in expected_columns:
-            self.assertIn(col, result.columns, f"{col} sütunu eksik!")
+            self.assertIn(col, result.columns, f"{col} column is missing!")
             
         self.assertFalse(pd.isna(result.iloc[0]['Net_Profit']))
         self.assertTrue(result.iloc[0]['Net_Profit'] > 0)
