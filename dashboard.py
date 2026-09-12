@@ -10,10 +10,20 @@ from engine_spot import SpotFutureEngine
 from engine_spread import FutureSpreadEngine
 from position_tracker import PositionTracker
 from storage import StorageManager
+from linux_notifier import LinuxNotifier
 
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
+
+def send_linux_notification(title: str, message: str):
+    subprocess.run(['notify-send', title, message, '-u', 'critical', '-i', 'dialog-warning'])
+    
+    sound_path = '/usr/share/sounds/freedesktop/stereo/message.oga'
+    try:
+        subprocess.run(['paplay', sound_path], stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 def get_asset_class(base_asset: str) -> str:
     if base_asset in CURRENCIES: return 'CURRENCY'
@@ -42,6 +52,7 @@ def main():
     spread_engine = FutureSpreadEngine()
     tracker = PositionTracker()
     storage = StorageManager()
+    notifier = LinuxNotifier()
 
     while True:
         try:
@@ -79,14 +90,21 @@ def main():
                 print("\n")
 
                 res_df = tracker.print_status(filtered_df, spread_results)
-                print("--- OPEN POSITIONS STATUS ---")
-                assert res_df is not None
-                print(res_df.fillna('-').round(2).to_string(index=False))
-                        
+                if res_df is not None and not res_df.empty:
+                    print("--- OPEN POSITIONS STATUS ---")
+                    print(res_df.fillna('-').round(2).to_string(index=False))
+                    
+                    # NOTIFICATION CHECK
+                    for _, row in res_df.iterrows():
+                        pot_profit = row['Pot_Profit']
+                        if pd.notna(pot_profit) and pot_profit < 0:
+                            msg = f"Arbitrage edge is totally consumed for {row['Pair']}"
+                            notifier.send("⚠️ Arbitrage Alert", msg)
+
         except Exception as e:
             print(f"Error: {e}")
             
-        time.sleep(5)
+        time.sleep(15)
 
 if __name__ == "__main__":
     main()

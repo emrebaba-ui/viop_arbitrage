@@ -32,7 +32,7 @@ class StorageManager:
         if now.weekday() >= 5:
             return False
         
-        if now.hour < 10:
+        if now.hour < 10 or now.hour > 18:
             return False
 
         self.cursor.execute("SELECT MAX(timestamp) FROM spread_logs")
@@ -42,7 +42,6 @@ class StorageManager:
             last_log_time = datetime.strptime(last_record, "%Y-%m-%d %H:%M:%S")
             if (now - last_log_time).total_seconds() < 3600:
                 return False
-            
                 
         return True
 

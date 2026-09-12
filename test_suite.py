@@ -80,5 +80,38 @@ class TestArbitrageModules(unittest.TestCase):
         self.assertFalse(pd.isna(result.iloc[0]['Net_Profit']))
         self.assertTrue(result.iloc[0]['Net_Profit'] > 0)
 
+from storage import StorageManager
+
+class TestStorageManager(unittest.TestCase):
+    def setUp(self):
+        self.db = StorageManager(db_name=":memory:")
+        
+    def test_table_creation(self):
+        self.db.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='spread_logs'")
+        self.assertIsNotNone(self.db.cursor.fetchone(), "spread_logs table could not be created!")
+
+    def test_save_empty_dataframe(self):
+        empty_df = pd.DataFrame()
+        self.db.save(empty_df)
+        self.db.cursor.execute("SELECT COUNT(*) FROM spread_logs")
+        self.assertEqual(self.db.cursor.fetchone()[0], 0)
+
+    def test_asset_filtering(self):
+        mock_data = pd.DataFrame([
+            {'Asset': 'XU030', 'Near_Action': 'BUY', 'Far_Action': 'SELL', 'Net_Profit': 100, 'Daily_Profit': 10, 'Req_Capital': 1000, 'Daily_ROI_%': 1},
+            {'Asset': 'THYAO', 'Near_Action': 'BUY', 'Far_Action': 'SELL', 'Net_Profit': 50, 'Daily_Profit': 5, 'Req_Capital': 500, 'Daily_ROI_%': 1}, # Hisse, filtreye takılmalı
+            {'Asset': 'USDTRY', 'Near_Action': 'SELL', 'Far_Action': 'BUY', 'Net_Profit': 200, 'Daily_Profit': 20, 'Req_Capital': 2000, 'Daily_ROI_%': 1}
+        ])
+        
+        self.db.should_log = lambda: True 
+        self.db.save(mock_data)
+        
+        self.db.cursor.execute("SELECT asset FROM spread_logs")
+        saved_assets = [row[0] for row in self.db.cursor.fetchall()]
+        
+        self.assertIn('XU030', saved_assets)
+        self.assertIn('USDTRY', saved_assets)
+        self.assertNotIn('THYAO', saved_assets, "Critical Error: Stocks are leaking into the database!")
+
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    unittest.main(verbosity=1)
