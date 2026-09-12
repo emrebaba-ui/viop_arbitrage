@@ -9,6 +9,7 @@ from data import MarketDataService
 from engine_spot import SpotFutureEngine
 from engine_spread import FutureSpreadEngine
 from position_tracker import PositionTracker
+from storage import StorageManager
 
 
 pd.set_option('display.max_columns', None)
@@ -40,7 +41,8 @@ def main():
     spot_engine = SpotFutureEngine()
     spread_engine = FutureSpreadEngine()
     tracker = PositionTracker()
-    
+    storage = StorageManager()
+
     while True:
         try:
             df, server_time_str = data_service.get_prepared_data()
@@ -71,6 +73,7 @@ def main():
                 if not spread_results.empty:
                     cols = ['Near_Action', 'Far_Action', 'Hold', 'Implied_%', 'Net_Profit', 'Pot_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI_%']
                     print(spread_results[cols].head(20).round(2).to_string(index=False))
+                    storage.save(spread_results)
                 else:
                     print("No profitable Future Spread opportunities found.")
                 print("\n")
@@ -83,7 +86,7 @@ def main():
         except Exception as e:
             print(f"Error: {e}")
             
-        time.sleep(3)
+        time.sleep(5)
 
 if __name__ == "__main__":
     main()
