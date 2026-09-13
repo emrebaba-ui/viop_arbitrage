@@ -51,34 +51,32 @@ def main():
             subprocess.run('clear')
             
             current_time = parse_and_adjust_time(server_time_str)
-            print("=" * 125)
-            print(f" ARBITRAGE DASHBOARD | Last Update: {current_time}")
-            print(f" Mode: {DISPLAY_MODE} | Assets: {ASSET_FILTER}")
-            print("=" * 125 + "\n")
+            print(f" Mode: {DISPLAY_MODE} | Assets: {ASSET_FILTER} | Last Update: {current_time}")
+            print()
             
             if df.empty:
                 print("No data available from API.")
             else:
                 filtered_df = filter_dataframe(df)
                 
-                print("--- SPOT-FUTURE OPPORTUNITIES (TOP 20) ---")
+                print("--- SPOT-FUTURE OPPORTUNITIES (TOP 10) ---")
                 spot_results = spot_engine.process(filtered_df)
                 if not spot_results.empty:
                     cols = ['Contract', 'Spot_Price', 'Future_Price', 'Days', 'Total_Comm', 'Net_Profit', 'Req_Capital', 'Arb_Monthly_%']
-                    print(spot_results[cols].head(20).round(2).to_string(index=False))
+                    print(spot_results[cols].head(10).round(2).to_string(index=False))
                 else:
                     print("No profitable Spot-Future opportunities found.")
-                print("\n")
+                print()
                     
-                print("--- FUTURE SPREAD OPPORTUNITIES (TOP 20) ---")
+                print("--- FUTURE SPREAD OPPORTUNITIES (TOP 30) ---")
                 spread_results = spread_engine.process(filtered_df)
                 if not spread_results.empty:
                     cols = ['Near_Action', 'Far_Action', 'Hold', 'Implied_%', 'Net_Profit', 'Pot_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI_%']
-                    print(spread_results[cols].head(20).round(2).to_string(index=False))
+                    print(spread_results[cols].head(30).round(2).to_string(index=False))
                     storage.save(spread_results)
                 else:
                     print("No profitable Future Spread opportunities found.")
-                print("\n")
+                print()
 
                 res_df = tracker.print_status(filtered_df, spread_results)
                 if res_df is not None and not res_df.empty:
