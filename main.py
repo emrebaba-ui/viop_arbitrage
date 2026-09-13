@@ -1,5 +1,5 @@
 import sys
-from dashboard import main as run_dashboard
+from core.dashboard import main as run_dashboard
 
 def start():
     # Start the main loop from dashboard.py

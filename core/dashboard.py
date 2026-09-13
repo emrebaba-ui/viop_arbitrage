@@ -5,25 +5,16 @@ from datetime import timedelta
 from email.utils import parsedate_to_datetime
 
 from config import *
-from data import MarketDataService
-from engine_spot import SpotFutureEngine
-from engine_spread import FutureSpreadEngine
-from position_tracker import PositionTracker
-from storage import StorageManager
-from linux_notifier import LinuxNotifier
+from core.data import MarketDataService
+from core.engine_spot import SpotFutureEngine
+from core.engine_spread import FutureSpreadEngine
+from core.position_tracker import PositionTracker
+from core.storage import StorageManager
+from core.linux_notifier import LinuxNotifier
 
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
-
-def send_linux_notification(title: str, message: str):
-    subprocess.run(['notify-send', title, message, '-u', 'critical', '-i', 'dialog-warning'])
-    
-    sound_path = '/usr/share/sounds/freedesktop/stereo/message.oga'
-    try:
-        subprocess.run(['paplay', sound_path], stderr=subprocess.DEVNULL)
-    except Exception:
-        pass
 
 def get_asset_class(base_asset: str) -> str:
     if base_asset in CURRENCIES: return 'CURRENCY'

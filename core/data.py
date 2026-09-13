@@ -10,7 +10,7 @@ from config import *
 
 # --- LOGGING ---
 logging.basicConfig(
-    filename='arbitrage_error.log',
+    filename='data/arbitrage_error.log',
     level=logging.ERROR,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )

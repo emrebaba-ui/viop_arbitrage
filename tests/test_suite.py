@@ -2,10 +2,10 @@ import unittest
 import pandas as pd
 from datetime import datetime
 
-from data import get_base_asset, get_multiplier
-from engine_spot import SpotFutureEngine
-from engine_spread import FutureSpreadEngine
-from position_tracker import PositionTracker
+from core.data import get_base_asset, get_multiplier
+from core.engine_spot import SpotFutureEngine
+from core.engine_spread import FutureSpreadEngine
+from core.position_tracker import PositionTracker
 
 
 class TestArbitrageModules(unittest.TestCase):
@@ -80,7 +80,7 @@ class TestArbitrageModules(unittest.TestCase):
         self.assertFalse(pd.isna(result.iloc[0]['Net_Profit']))
         self.assertTrue(result.iloc[0]['Net_Profit'] > 0)
 
-from storage import StorageManager
+from core.storage import StorageManager
 
 class TestStorageManager(unittest.TestCase):
     def setUp(self):

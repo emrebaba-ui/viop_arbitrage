@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 import subprocess
-from linux_notifier import LinuxNotifier
+from core.linux_notifier import LinuxNotifier
 
 
 class TestLinuxNotifier(unittest.TestCase):
