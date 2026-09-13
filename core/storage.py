@@ -6,7 +6,7 @@ from config import *
 
 
 class StorageManager:
-    def __init__(self, db_name="data/arbitrage_logs.db"):
+    def __init__(self, db_name=ARB_DB_FILE_PATH):
         self.conn = sqlite3.connect(db_name)
         self.cursor = self.conn.cursor()
         self._create_table()

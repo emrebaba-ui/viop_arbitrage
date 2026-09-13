@@ -1,8 +1,11 @@
 import pandas as pd
 import numpy as np
 
+from config import TRADES_PATH
+
+
 class PositionTracker:
-    def __init__(self, trades_file='data/trades.csv'):
+    def __init__(self, trades_file=TRADES_PATH):
         self.trades_file = trades_file
 
     def parse_action(self, action_str):

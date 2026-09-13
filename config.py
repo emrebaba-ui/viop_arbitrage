@@ -1,11 +1,10 @@
-"""
- ** For now, its unnecessary **
-import os
-from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
-api_key = os.getenv("API_KEY")
-"""
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+ERROR_LOG_FILE_PATH = PROJECT_ROOT / 'data' / 'arbitrage_error.log'
+ARB_DB_FILE_PATH = PROJECT_ROOT / 'data' / 'arbitrage_logs.db'
+TRADES_PATH = PROJECT_ROOT / 'data' / 'trades.csv'
 
 # --- FILTERS ---
 DISPLAY_MODE = 'ALL'
@@ -23,3 +22,13 @@ MONTHLY_RISK_FREE_RATE = (1 + ANNUAL_RISK_FREE_RATE) ** (1/12) - 1
 CURRENCIES = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
 INDICES = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
 METALS = {'XAUUSD', 'XAUTRY', 'XPTUSD', 'XPDUSD', 'XAGUSD', 'XAGTRY', 'XCUUSD'}
+
+
+"""
+ ** In case of a API key **
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+api_key = os.getenv("API_KEY")
+"""
