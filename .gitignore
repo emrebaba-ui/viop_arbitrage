@@ -1,5 +1,7 @@
 __pycache__/
+fintables_profile
 *.csv
 .env
 *.log
 *.db
+*.txt

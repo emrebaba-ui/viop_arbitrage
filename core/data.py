@@ -54,18 +54,13 @@ def calculate_days_to_exp(contract_code: str, current_date: datetime) -> int:
 
 class MarketDataService:
     def __init__(self):
-        self.url = "https://markets.fintables.com/barbar/server/?type=future"
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-            "Accept": "application/json",
-            "Origin": "https://fintables.com",
-            "Referer": "https://fintables.com/"
-        }
-        self.max_retries = 5
+        self.url = URL
+        self.headers = HEADERS
+        self.max_retries = BACKOFF_MAX_RETRIES
 
     def fetch_raw_data(self) -> tuple:
-        retries = 0
-        backoff_time = 2
+        retries = 1
+        backoff_time = BACKOFF_TIME
         
         while retries <= self.max_retries:
             try:
@@ -82,16 +77,15 @@ class MarketDataService:
                     return df, server_time_str
                     
                 else:
-                    # Cloudflare 403 alike server errors
-                    logging.error(f"API Error: Status Code {response.status_code}. Attempt {retries + 1}/{self.max_retries + 1}")
+                    print(f"API Error: Status Code {response.status_code}. Attempt {retries}/{self.max_retries}")
+                    logging.error(f"API Error: Status Code {response.status_code}. Attempt {retries}/{self.max_retries}")
                     
             except Exception as e:
                 # Physical errors
-                logging.error(f"Connection Failed: {e}. Attempt {retries + 1}/{self.max_retries + 1}")
+                logging.error(f"Connection Failed: {e}. Attempt {retries}/{self.max_retries}")
                 
-            if retries < self.max_retries:
-                time.sleep(backoff_time)
-                backoff_time *= 2
+            time.sleep(backoff_time)
+            backoff_time *= 2
             retries += 1
 
         return pd.DataFrame(), None
