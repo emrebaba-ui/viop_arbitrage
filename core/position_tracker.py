@@ -26,7 +26,11 @@ class PositionTracker:
             return
 
         # filter open positions
-        open_pos = df_trades[df_trades['Result'].fillna('').str.strip() == ''].copy()
+        open_pos = df_trades[
+        df_trades["Result"].map(
+            lambda v: pd.isna(v) or (isinstance(v, str) and v.strip() == "")
+            )].copy()
+
         if open_pos.empty:
             return
             
@@ -90,3 +94,15 @@ class PositionTracker:
             })
 
         return pd.DataFrame(results)
+
+if __name__ == "__main__":
+    tracker = PositionTracker()
+    live_data = pd.DataFrame([
+        {'Contract': 'F_HALKB0926', 'bid': 50.5, 'ask': 51.0, 'Multiplier': 100},
+        {'Contract': 'F_VAKBN0926', 'bid': 30.0, 'ask': 30.5, 'Multiplier': 100}
+    ])
+    spread_results = pd.DataFrame([
+        {'Near_Contract': 'F_HALKB0926', 'Far_Contract': 'F_VAKBN0926', 'Implied_%': 1.5, 'Total_Comm': 0.1, 'Net_Profit': 100, 'Pot_Profit': 150}
+    ])
+    status_df = tracker.print_status(live_data, spread_results)
+    print(status_df)

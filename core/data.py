@@ -7,6 +7,7 @@ import calendar
 import re
 
 from config import *
+from tools.fin_auth import FintablesAuth
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -58,12 +59,23 @@ class MarketDataService:
         self.headers = HEADERS
         self.max_retries = BACKOFF_MAX_RETRIES
 
+    def _refresh_security_headers(self):
+        auth = FintablesAuth()
+        fresh_headers = auth.get_fresh_headers()
+        
+        if fresh_headers:
+            self.headers.update(fresh_headers)
+            print("Header information was refreshed.")
+        else:
+            logging.error("Security headers could not be obtained.")
+        
     def fetch_raw_data(self) -> tuple:
         retries = 1
         backoff_time = BACKOFF_TIME
         
         while retries <= self.max_retries:
             try:
+                self._refresh_security_headers()
                 response = requests.get(self.url, headers=self.headers, impersonate="chrome")
                 
                 if response.status_code == 200:
@@ -75,7 +87,11 @@ class MarketDataService:
                         for code, vals in data["results"].items()
                     ])
                     return df, server_time_str
-                    
+
+                elif response.status_code in [401, 403]:
+                    logging.warning(f"Authentication failed ({response.status_code}). Refreshing headers...")
+                    print(f"Authentication failed ({response.status_code}). Refreshing headers...")
+
                 else:
                     print(f"API Error: Status Code {response.status_code}. Attempt {retries}/{self.max_retries}")
                     logging.error(f"API Error: Status Code {response.status_code}. Attempt {retries}/{self.max_retries}")

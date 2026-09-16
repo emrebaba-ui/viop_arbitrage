@@ -42,11 +42,21 @@ class FintablesAuth:
             for _ in range(120):
                 if "x-ft-request-context" in captured_headers:
                     cookies = context.cookies("https://fintables.com")
-                    cookie_str = "; ".join([f"{c['name']}={c['value']}" for c in cookies])
-                    captured_headers["cookie"] = cookie_str
+                    cookie_parts = []
+                    has_error = False
                     
-                    print("\n[SUCCESS] Required headers and cookies captured.")
-                    break
+                    for c in cookies:
+                        if 'name' not in c or 'value' not in c:
+                            print(f"\nMissing keys: {c}")
+                            has_error = True
+                            break
+                        
+                        cookie_parts.append(f"{c['name']}={c['value']}")
+                    
+                    if not has_error and cookie_parts:
+                        captured_headers["cookie"] = "; ".join(cookie_parts)
+                        print("\n[3] Cookies were captured successfully.")
+                        break 
                 
                 page.wait_for_timeout(1000)
                 
@@ -61,7 +71,6 @@ if __name__ == "__main__":
     
     print("\n--- EXTRACTED INFO ---")
     if headers:
-        print(f"X-FT-Context : {(headers.get('x-ft-request-context', 'Not Found'))[:50]}...")
-        print(f"Cookie       : {(headers.get('cookie', 'Not Found'))[:50]}...")
+        print(headers)
     else:
         print("No relevant information captured.")
