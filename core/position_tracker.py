@@ -79,7 +79,7 @@ class PositionTracker:
                 if not match.empty:
                     # columns must match engine_spread.py outputs
                     implied = match.iloc[0].get('Implied_%', np.nan)
-                    total_comm = match.iloc[0].get('Total_Comm', np.nan)
+                    total_comm = match.iloc[0].get('Total_Comm', 0.0)
                     net_profit = match.iloc[0].get('Net_Profit', np.nan)
                     pot_profit = match.iloc[0].get('Pot_Profit', np.nan)
 
@@ -95,14 +95,3 @@ class PositionTracker:
 
         return pd.DataFrame(results)
 
-if __name__ == "__main__":
-    tracker = PositionTracker()
-    live_data = pd.DataFrame([
-        {'Contract': 'F_HALKB0926', 'bid': 50.5, 'ask': 51.0, 'Multiplier': 100},
-        {'Contract': 'F_VAKBN0926', 'bid': 30.0, 'ask': 30.5, 'Multiplier': 100}
-    ])
-    spread_results = pd.DataFrame([
-        {'Near_Contract': 'F_HALKB0926', 'Far_Contract': 'F_VAKBN0926', 'Implied_%': 1.5, 'Total_Comm': 0.1, 'Net_Profit': 100, 'Pot_Profit': 150}
-    ])
-    status_df = tracker.print_status(live_data, spread_results)
-    print(status_df)
