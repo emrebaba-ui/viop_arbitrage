@@ -8,6 +8,7 @@ import re
 
 from config import *
 from tools.fin_auth import FintablesAuth
+from engine_target import calculate_target_rate
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -115,6 +116,7 @@ class MarketDataService:
         current_date = datetime.now()
         df['BaseAsset'] = df['Contract'].apply(get_base_asset)
         df['Multiplier'] = df['BaseAsset'].apply(get_multiplier)
+        df['Target_Rate'] = df['BaseAsset'].apply(calculate_target_rate)
         df['Days'] = df['Contract'].apply(lambda x: calculate_days_to_exp(x, current_date))
         
         usdtry_df = df[df['BaseAsset'] == 'USDTRY'].sort_values('Days')
