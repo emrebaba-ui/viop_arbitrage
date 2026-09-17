@@ -39,12 +39,12 @@ CURRENCIES = {'USDTRY', 'EURTRY', 'EURUSD', 'GBPUSD', 'CNHTRY', 'RUBTRY'}
 INDICES = {'XU030', 'XLBNK', 'X10XB', 'XSD25', 'SASX10'}
 METALS = {'XAUUSD', 'XAUTRY', 'XAUTRYM', 'XPTUSD', 'XPDUSD', 'XAGUSD', 'XAGTRY', 'XCUUSD'}
 
+# --- RISK-FREE RATES ---
+CUR_RATE_DICT = {
+    'USD': 0.04,
+    'EUR': 0.265,
+    'GBP': 0.0375,
+    'CNH': 0.03,
+    'RUB': 0.14
+}
 
-"""
- ** In case of a API key **
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-api_key = os.getenv("API_KEY")
-"""

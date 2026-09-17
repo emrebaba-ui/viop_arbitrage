@@ -65,7 +65,6 @@ class FintablesAuth:
         return captured_headers
 
 if __name__ == "__main__":
-    # For the first run, it should be set to headless=False to allow manual login and cookie capture.
     auth = FintablesAuth(headless=False)
     headers = auth.get_fresh_headers()
     

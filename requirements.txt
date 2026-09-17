@@ -1,3 +1,5 @@
 curl_cffi==0.16.3
 numpy==2.5.3
 pandas==3.0.5
+playwright==1.61.0
+Requests==2.34.2
