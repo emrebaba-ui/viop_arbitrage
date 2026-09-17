@@ -68,11 +68,11 @@ def main():
                     print("No profitable Spot-Future opportunities found.")
                 print()
                     
-                print("--- FUTURE SPREAD OPPORTUNITIES (TOP 30) ---")
+                print("--- FUTURE SPREAD OPPORTUNITIES (TOP 100) ---")
                 spread_results = spread_engine.process(filtered_df)
                 if not spread_results.empty:
                     cols = ['Near_Action', 'Far_Action', 'Hold', 'Implied_%', 'Net_Profit', 'Pot_Profit', 'Req_Capital', 'Daily_Profit', 'Daily_ROI_%']
-                    print(spread_results[cols].head(30).round(2).to_string(index=False))
+                    print(spread_results[cols].head(100).round(2).to_string(index=False))
                     storage.save(spread_results)
                 else:
                     print("No profitable Future Spread opportunities found.")

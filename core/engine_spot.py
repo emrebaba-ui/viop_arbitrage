@@ -4,9 +4,8 @@ from config import *
 
 
 class SpotFutureEngine:
-    def __init__(self, min_volume_tl=SPOT_MIN_VOLUME_TL, monthly_rate=MONTHLY_RISK_FREE_RATE, stopaj=STOPPAGE, commission_rate=COMMISSION_RATE):
+    def __init__(self, min_volume_tl=SPOT_MIN_VOLUME_TL, stopaj=STOPPAGE, commission_rate=COMMISSION_RATE):
         self.min_volume_tl = min_volume_tl
-        self.monthly_rate = monthly_rate
         self.stopaj = stopaj
         self.commission_rate = commission_rate
 
@@ -16,25 +15,24 @@ class SpotFutureEngine:
             
         df = df.dropna(subset=['underlying_close', 'bid', 'volume_lot', 'Req_Capital']).copy()
         df = df[(df['underlying_close'] > 0) & (df['bid'] > 0)]
+
         
-        is_usd = df['BaseAsset'].str.endswith('USD')
-        fx_rate = df['USD_Rate'].where(is_usd, 1.0)
         
-        df['Volume_TL'] = df['volume_lot'] * df['bid'] * df['Multiplier'] * fx_rate
+        df['Volume_TL'] = df['volume_lot'] * df['bid'] * df['Multiplier'] * df['FX_Rate']
         df = df[df['Volume_TL'] >= self.min_volume_tl].copy()
         
         if df.empty:
             return df
             
-        df['Gross_Profit'] = (df['bid'] - df['underlying_close']) * df['Multiplier'] * fx_rate
-        df['Total_Comm'] = self.commission_rate * (df['bid'] + df['underlying_close']) * df['Multiplier'] * fx_rate
+        df['Gross_Profit'] = (df['bid'] - df['underlying_close']) * df['Multiplier'] * df['FX_Rate']
+        df['Total_Comm'] = self.commission_rate * (df['bid'] + df['underlying_close']) * df['Multiplier'] * df['FX_Rate']
         df['Net_Profit'] = df['Gross_Profit'] - df['Total_Comm']
         
         # VIOP margin requirement is disregarded
-        df['Spot_Cost'] = df['underlying_close'] * df['Multiplier'] * fx_rate
+        df['Spot_Cost'] = df['underlying_close'] * df['Multiplier'] * df['FX_Rate']
         df['Req_Capital'] = df['Spot_Cost'] 
         
-        alt_gross = df['Req_Capital'] * ((1 + self.monthly_rate) ** (df['Days'] / 30)) - df['Req_Capital']
+        alt_gross = df['Req_Capital'] * ((1 + df['Target_Rate']) ** (df['Days'] / 30)) - df['Req_Capital']
         df['Alt_Net_Return'] = alt_gross * (1 - self.stopaj)
         
         # (1+monthly_rate)^(30/days) - 1 mechanism // each return was standardized on a monthly basis

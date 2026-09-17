@@ -5,8 +5,7 @@ from config import *
 
 
 class FutureSpreadEngine:
-    def __init__(self, target_rate=ANNUAL_RISK_FREE_RATE, min_volume_tl=SPREAD_MIN_VOLUME_TL, commission_rate=COMMISSION_RATE):
-        self.target_rate = target_rate 
+    def __init__(self, min_volume_tl=SPREAD_MIN_VOLUME_TL, commission_rate=COMMISSION_RATE):
         self.min_volume_tl = min_volume_tl
         self.commission_rate = commission_rate
 
@@ -16,12 +15,9 @@ class FutureSpreadEngine:
             
         df = df.dropna(subset=['bid', 'ask', 'volume_lot', 'Req_Capital']).copy()
         df = df[(df['bid'] > 0) & (df['ask'] > 0)]
-        
-        is_usd = df['BaseAsset'].str.endswith('USD')
-        fx_rate = df['USD_Rate'].where(is_usd, 1.0)
-        
+                
         df['Mid_Price'] = (df['bid'] + df['ask']) / 2
-        df['Volume_TL'] = df['volume_lot'] * df['Mid_Price'] * df['Multiplier'] * fx_rate
+        df['Volume_TL'] = df['volume_lot'] * df['Mid_Price'] * df['Multiplier'] * df['FX_Rate']
         df = df[df['Volume_TL'] >= self.min_volume_tl].copy()
         
         if df.empty:
@@ -33,9 +29,6 @@ class FutureSpreadEngine:
             if len(group) < 2: 
                 continue
 
-            asset_key = str(asset).upper()
-            asset_rate = 0.04 if asset_key.endswith('USD') else self.target_rate 
-                
             group = group.sort_values('Days')
             contracts = group.to_dict('records')
             
@@ -44,8 +37,7 @@ class FutureSpreadEngine:
                 if days_diff <= 0: continue
                 
                 multiplier = c1['Multiplier']
-                is_usd_asset = asset_key.endswith('USD')
-                fx = c1.get('USD_Rate', 1.0) if is_usd_asset else 1.0
+                target_rate = c1.get('Target_Rate', 0.0)
 
                 if multiplier == 100: # Stocks must be sold ~3 days earlier
                     convergence_ratio = (c1['Days'] - 3) / (c2['Days'])
@@ -55,24 +47,24 @@ class FutureSpreadEngine:
                 # -------------- BUY SPREAD --------------
                 implied_rate_buy = (c2['ask'] / c1['bid']) ** (365 / days_diff) - 1
                 
-                theoretical_price_buy = c1['bid'] * ((1 + asset_rate) ** (days_diff / 365))
+                theoretical_price_buy = c1['bid'] * ((1 + target_rate) ** (days_diff / 365))
                 spread_buy = theoretical_price_buy - c2['ask']
                 
-                gross_profit_buy = spread_buy * multiplier * fx
+                gross_profit_buy = spread_buy * multiplier * c1['FX_Rate']
                 gross_profit_buy_conv = gross_profit_buy * convergence_ratio
-                comm_buy = (c1['bid'] + c2['ask']) * multiplier * self.commission_rate * fx
+                comm_buy = (c1['bid'] + c2['ask']) * multiplier * self.commission_rate * c1['FX_Rate']
                 pot_profit_buy = gross_profit_buy - comm_buy
                 net_profit_buy = gross_profit_buy_conv - comm_buy
                 
                 # -------------- SELL SPREAD --------------
                 implied_rate_sell = (c2['bid'] / c1['ask']) ** (365 / days_diff) - 1
                 
-                theoretical_price_sell = c1['ask'] * ((1 + asset_rate) ** (days_diff / 365))
+                theoretical_price_sell = c1['ask'] * ((1 + target_rate) ** (days_diff / 365))
                 spread_sell = c2['bid'] - theoretical_price_sell
                 
-                gross_profit_sell = spread_sell * multiplier * fx
+                gross_profit_sell = spread_sell * multiplier * c1['FX_Rate']
                 gross_profit_sell_conv = gross_profit_sell * convergence_ratio
-                comm_sell = (c1['ask'] + c2['bid']) * multiplier * self.commission_rate * fx
+                comm_sell = (c1['ask'] + c2['bid']) * multiplier * self.commission_rate * c1['FX_Rate']
                 pot_profit_sell = gross_profit_sell - comm_sell
                 net_profit_sell = gross_profit_sell_conv - comm_sell
                 

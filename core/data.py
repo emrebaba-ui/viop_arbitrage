@@ -3,12 +3,10 @@ import pandas as pd
 import time
 from curl_cffi import requests
 from datetime import datetime
-import calendar
-import re
 
 from config import *
 from tools.fin_auth import FintablesAuth
-from engine_target import calculate_target_rate
+from core.data_standardizer import *
 
 # --- LOGGING ---
 logging.basicConfig(
@@ -17,42 +15,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def get_base_asset(contract_code: str) -> str:
-    # Remove prefix
-    c = re.sub(r'^(?:TM_)?F_', '', contract_code)
-    
-    # Check known indices with numbers
-    for idx in INDICES:
-        if c.startswith(idx): 
-            return idx
-            
-    # For standard assets (HEKTS, USDTRY, XAUUSD), extract letters
-    m = re.match(r'^([A-Za-z]+)', c)
-    if m: 
-        return m.group(1)
-        
-    return c[:-4] # Fallback
-
-def get_multiplier(base_asset: str) -> int:
-    metals_10 = {'XAGUSD', 'XAGTRY'}
-    
-    if base_asset in CURRENCIES: return 1000
-    elif base_asset in INDICES: return 10
-    elif base_asset in metals_10: return 10
-    elif base_asset in METALS: return 1
-    return 100
-
-def calculate_days_to_exp(contract_code: str, current_date: datetime) -> int:
-    match = re.search(r'\d{4,6}$', contract_code)
-    if not match: return 1
-        
-    mmyy = match.group()
-    month = int(mmyy[-4:-2])
-    year = int("20" + mmyy[-2:])
-    _, last_day = calendar.monthrange(year, month)
-    
-    target_date = datetime(year, month, last_day)
-    return max((target_date - current_date).days, 1)
 
 class MarketDataService:
     def __init__(self):
@@ -118,18 +80,6 @@ class MarketDataService:
         df['Multiplier'] = df['BaseAsset'].apply(get_multiplier)
         df['Target_Rate'] = df['BaseAsset'].apply(calculate_target_rate)
         df['Days'] = df['Contract'].apply(lambda x: calculate_days_to_exp(x, current_date))
-        
-        usdtry_df = df[df['BaseAsset'] == 'USDTRY'].sort_values('Days')
-        if not usdtry_df.empty:
-            best_row = usdtry_df.iloc[0]
-            usd_rate = best_row['bid'] if pd.notna(best_row['bid']) and best_row['bid'] > 0 else best_row['underlying_close']
-        else:
-            usd_rate = 1.0
-            
-        df['USD_Rate'] = usd_rate
-        df['Req_Capital'] = df['psr_close'].astype(float)
-        
-        is_usd_based = df['BaseAsset'].str.endswith('USD')
-        df.loc[is_usd_based, 'Req_Capital'] = df['Req_Capital'] * df['USD_Rate']
+        df = standardize_capital(df)
         
         return df, server_time
