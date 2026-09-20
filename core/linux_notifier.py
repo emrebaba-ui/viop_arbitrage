@@ -5,10 +5,15 @@ class LinuxNotifier:
         self.sound_path = '/usr/share/sounds/freedesktop/stereo/message.oga'
 
     def send(self, title: str, message: str):
-        # critical flag
-        subprocess.run(['notify-send', title, message, '-u', 'critical', '-i', 'dialog-warning'])
-        
+        subprocess.Popen(
+            ['notify-send', title, message, '-u', 'critical', '-i', 'dialog-warning'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
         try:
-            subprocess.run(['paplay', self.sound_path], stderr=subprocess.DEVNULL)
+            subprocess.Popen(['paplay', self.sound_path], 
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
         except Exception:
             pass

@@ -84,11 +84,18 @@ def main():
                     print(res_df.fillna('-').round(2).to_string(index=False))
                     
                     # NOTIFICATION CHECK
-                    for _, row in res_df.iterrows():
-                        pot_profit = row['Pot_Profit']
-                        if pd.notna(pot_profit) and pot_profit < 0:
-                            msg = f"Arbitrage edge is totally consumed for {row['Pair']}"
-                            notifier.send("⚠️ Arbitrage Alert", msg)
+                    alerts = res_df.loc[
+                        res_df["Pot_Profit"].lt(0) &
+                        res_df["Pot_Profit"].notna(),
+                        "Pair"
+                        ]
+
+                    if not alerts.empty:
+                        pairs = ", ".join(alerts.astype(str))
+                        notifier.send(
+                            "Arbitrage Alert",
+                            f"Arbitrage edge is totally consumed for: {pairs}"
+                            )
 
         except Exception as e:
             print(f"Error: {e}")
